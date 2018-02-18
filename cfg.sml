@@ -89,6 +89,57 @@ fun calcFirst first nullable prods =
     if isUpdated then calcFirst first' nullable prods else first'
   end
 
+fun initFollow syms =
+  let
+    fun init (sym, map) = Map.insert (map, sym, Set.empty)
+  in
+    foldl init Map.empty syms
+  end
+
+exception Exception
+
+fun updateFollow follow nullable first (x, [])  = (follow, false)
+  | updateFollow follow nullable first (x, rhs) =
+  let
+    fun subRhs []         = []
+      | subRhs (sym::rhs) = if Map.lookup (nullable, sym)
+                            then sym::subRhs rhs else [sym]
+    fun updateFollowY _ [] = raise Exception
+      | updateFollowY flwX (y::ys) =
+      let
+        val flwY  = Map.lookup (follow, y)
+        val ys'   = subRhs ys
+        val flwY1 = if List.all (fn z => Map.lookup (nullable, z)) ys
+                    then Set.union (flwY, flwX) else flwY
+        val flwY2 = foldl (fn (y, flwZ) =>
+                              Set.union (flwZ, Map.lookup (first, y))) flwY ys'
+        val flwY' = Set.union (flwY1,flwY2) 
+      in
+        ((y, flwY'), not (Set.equal (flwY, flwY')))
+      end
+    fun apply f []  = raise Exception
+      | apply f [z] = [f [z]]
+      | apply f zs  = f zs::apply f (tl zs)
+    val flwX = Map.lookup (follow, x)
+    val lst = apply (updateFollowY flwX) rhs
+  in
+    foldl (fn (((y, flwY), b), (flw, b')) =>
+              (Map.insert (flw, y, flwY), b orelse b')) (follow, false) lst
+  end
+
+fun calcFollow follow nullable first prods =
+  let
+    fun f (prod, (flw, flg)) =
+      let
+        val (flw', flg') = updateFollow flw nullable first prod
+      in
+        (flw', flg orelse flg')
+      end
+    val (follow', isUpdated) = foldl f (follow, false) prods
+  in
+    if isUpdated then calcFollow follow' nullable first prods else follow'
+  end
+
 fun sym2s (TERM a)  = a
   | sym2s (NTERM A) = A
 
@@ -109,6 +160,8 @@ fun printFirst first =
     (fn (sym, set) =>
         println (sym2s sym ^ " : " ^
                  String.concatWith " " (map sym2s (Set.toList set)))) first
+
+val printFollow = printFirst
 
 (* Example: Expression Grammer
  *   E  -> T E'
@@ -147,7 +200,16 @@ val prods = [prod1, prod2, prod3, prod4, prod5, prod6, prod7, prod8]
 
 val nullable = calcNullable (initNullable syms) prods
 val first    = calcFirst (initFirst syms) nullable prods
+val follow   = calcFollow (initFollow syms) nullable first prods
 
-val () = app (println o prod2s) prods
-val () = printNullable nullable
-val () = printFirst first
+val () = (println "----- productions -----";
+          app (println o prod2s) prods;
+          println "";
+          println "----- nullable set -----";
+          printNullable nullable;
+          println "";
+          println "----- first set -----";
+          printFirst first;
+          println "";
+          println "----- follow set -----";
+          printFollow follow)
