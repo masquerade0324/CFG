@@ -71,7 +71,7 @@ fun updateFirst first nullable (x, ys) =
     val ys'   = subRhs ys
     val fstX  = Map.lookup (first, x)
     val fstX' = foldl (fn (y, fstY) =>
-                          Set.union (fstY, Map.lookup (first, y))) fstX ys
+                          Set.union (fstY, Map.lookup (first, y))) fstX ys'
   in
     (Map.insert (first, x, fstX'), not (Set.equal (fstX, fstX')))
   end
